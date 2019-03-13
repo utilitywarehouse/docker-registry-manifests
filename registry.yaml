@@ -1,0 +1,326 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docker-registry
+  namespace: sys-registry
+data:
+  config.yml: |-
+    # Registry v2.1 comes with features like
+    # "Some config values can be set from the environment, but not if
+    # contradictory settings are in the config.yml". We use this as a
+    # config data volume to attach to the registry so we can override with
+    # ENV variables from Ansible.
+    version: 0.1
+    log:
+      accesslog:
+        disabled: true
+      level: warn
+      fields:
+        service: registry
+    storage:
+      s3:
+        region: eu-west-1
+        bucket: bucket-name
+        encrypt: true
+      delete:
+        enabled: true
+    http:
+      addr: localhost:5000
+
+  nginx.conf: |-
+    daemon off;
+
+    worker_processes 2;
+
+    events {
+        worker_connections 1024;
+    }
+
+    error_log /dev/stdout warn;
+
+    http {
+        upstream docker-registry {
+            server 127.0.0.1:5000;
+        }
+
+        ## Default combined log_format:
+        # log_format combined '$remote_addr - $remote_user [$time_local] '
+        #                     '"$request" $status $body_bytes_sent '
+        #                     '"$http_referer" "$http_user_agent"';
+
+        ## Our log_format
+        log_format proxy '$http_x_forwarded_for - $remote_user [$time_local] '
+                         '"$request" $status $body_bytes_sent '
+                         '"$http_referer" "$http_user_agent" (via $remote_addr)';
+
+        access_log off;
+
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        server_names_hash_bucket_size 64;
+        sendfile on;
+
+        # disable any limits to avoid HTTP 413 for large image uploads
+        client_max_body_size 0;
+
+        client_body_timeout 3600s;
+
+        # required to avoid HTTP 411: see Issue 1486
+        # https://github.com/dotcloud/docker/issues/1486
+        chunked_transfer_encoding on;
+
+        ## Set a variable to help us decide if we need to add the
+        ## 'Docker-Distribution-Api-Version' header.
+        ## The registry always sets this header.
+        ## In the case of nginx performing auth, the header will be unset
+        ## since nginx is auth-ing before proxying.
+        map $upstream_http_docker_distribution_api_version $docker_distribution_api_version {
+            'registry/2.0' '';
+            default registry/2.0;
+        }
+
+        server {
+            listen 8080 default_server;
+            server_name  registry.uw.systems;
+            server_name_in_redirect on;
+            absolute_redirect off;
+
+            if ($http_x_forwarded_proto = "http") {
+                return 301 https://$host$request_uri;
+            }
+
+            location / {
+                add_header Content-Type text/plain;
+                return 200 "Nothing to see here.";
+            }
+
+            ## Clients will fallback to v1 registry API if they get a 404 on /v2/
+            location /v1/ {
+                return 404;
+            }
+
+            location /v2/ {
+                # Do not allow connections from docker 1.5 and earlier
+                # docker < 1.6.0 did not properly set the user agent on ping, catch 'Go *' user agents
+                if ($http_user_agent ~ "^(docker\/1\.(3|4|5(?!\.[0-9]-dev))|Go ).*\$" ) {
+                    return 404;
+                }
+
+                # To add basic authentication to v2 use auth_basic setting plus add_header
+                auth_basic "Registry realm";
+                auth_basic_user_file /etc/nginx.docker-registry-auth/docker-registry.htpasswd;
+
+                ## If $docker_distribution_api_version is empty, the header will not be added.
+                ## See the map directive above where this variable is defined.
+                add_header 'Docker-Distribution-Api-Version' $docker_distribution_api_version always;
+
+                ## Need to add this header always, because otherwise
+                ## Docker sees the 401 and decides to fall back to v1 auth
+
+                proxy_pass                          http://docker-registry;
+                proxy_set_header  Host              $http_host;   # required for docker client's sake
+
+                ## AWS ELB sets these headers automatically.
+                ## Uncomment if not behind AWS ELB.
+                # proxy_set_header  X-Real-IP         $remote_addr; # pass on real client's IP
+                # proxy_set_header  X-Forwarded-For   $proxy_add_x_forwarded_for;
+
+                ## Since ELB terminates TLS, we have to fudge here,
+                ## otherwise the Docker registry will point at http urls.
+                proxy_set_header  X-Forwarded-Proto https;
+                proxy_read_timeout                  3600s;
+            }
+        }
+    }
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: docker-registry-internal
+  namespace: sys-registry
+  labels:
+    kubernetes.io/ingress.class: traefik-private
+spec:
+  rules:
+  - host: registry-browser.example
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: docker-registry
+          servicePort: 80
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  labels:
+    kubernetes.io/ingress.class: traefik-public
+  name: docker-registry
+  namespace: sys-registry
+spec:
+  rules:
+  - host: registry.example
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: docker-registry
+          servicePort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    ingress.kubernetes.io/affinity: "true"
+    traefik.backend.loadbalancer.stickiness: "true"
+  labels:
+    name: docker-registry
+  name: docker-registry
+  namespace: sys-registry
+spec:
+  selector:
+    app: docker-registry
+  ports:
+    - name: registry
+      protocol: TCP
+      port: 8080
+    - name: frontend
+      protocol: TCP
+      port: 80
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: docker-registry
+  namespace: sys-registry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: docker-registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-registry
+  namespace: sys-registry
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: docker-registry
+  template:
+    metadata:
+      name: docker-registry
+      labels:
+        app: docker-registry
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - docker-registry
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      containers:
+      - name: docker-registry
+        image: registry:2.6.2
+        resources:
+          requests:
+            cpu: 0m
+            memory: 32Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        env:
+          - name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: docker-registry
+                key: registry_storage_s3_accesskey
+          - name: REGISTRY_STORAGE_S3_SECRETKEY
+            valueFrom:
+              secretKeyRef:
+                name: docker-registry
+                key: registry_storage_s3_secretkey
+          - name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: docker-registry
+                key: registry_http_secret
+        volumeMounts:
+          - name: docker-registry-config-volume
+            mountPath: /etc/docker/registry/
+            readOnly: true
+      - name: nginx
+        image: nginx:1.13-alpine
+        resources:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        command:
+          - /usr/sbin/nginx
+          - -c
+          - /etc/nginx.docker-registry/nginx.conf
+        ports:
+          - name: registry
+            containerPort: 8080
+        volumeMounts:
+          - name: nginx-config-volume
+            mountPath: /etc/nginx.docker-registry
+            readOnly: true
+          - name: nginx-basicauth-volume
+            mountPath: /etc/nginx.docker-registry-auth
+            readOnly: true
+      - name: docker-registry-frontend
+        image: konradkleine/docker-registry-frontend:v2
+        resources:
+          requests:
+            cpu: 0m
+            memory: 4Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        env:
+          - name: ENV_DOCKER_REGISTRY_HOST
+            value: "localhost"
+          - name: ENV_DOCKER_REGISTRY_PORT
+            value: "5000"
+          - name: ENV_REGISTRY_PROXY_FQDN
+            value: "registry.uw.systems"
+          - name: ENV_REGISTRY_PROXY_PORT
+            value: "443"
+        ports:
+          - name: frontend
+            containerPort: 80
+      volumes:
+        - name: docker-registry-config-volume
+          configMap:
+            name: docker-registry
+            items:
+              - key: config.yml
+                path: config.yml
+        - name: nginx-config-volume
+          configMap:
+            name: docker-registry
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: nginx-basicauth-volume
+          secret:
+            secretName: docker-registry
+            items:
+              - key: docker-registry.htpasswd
+                path: docker-registry.htpasswd
