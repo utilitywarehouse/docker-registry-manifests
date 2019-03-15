@@ -245,17 +245,17 @@ spec:
           - name: REGISTRY_STORAGE_S3_ACCESSKEY
             valueFrom:
               secretKeyRef:
-                name: docker-registry
+                name: credentials
                 key: registry_storage_s3_accesskey
           - name: REGISTRY_STORAGE_S3_SECRETKEY
             valueFrom:
               secretKeyRef:
-                name: docker-registry
+                name: credentials
                 key: registry_storage_s3_secretkey
           - name: REGISTRY_HTTP_SECRET
             valueFrom:
               secretKeyRef:
-                name: docker-registry
+                name: credentials
                 key: registry_http_secret
         volumeMounts:
           - name: docker-registry-config-volume
@@ -320,7 +320,4 @@ spec:
                 path: nginx.conf
         - name: nginx-basicauth-volume
           secret:
-            secretName: docker-registry
-            items:
-              - key: docker-registry.htpasswd
-                path: docker-registry.htpasswd
+            secretName: htpasswd
