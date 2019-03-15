@@ -20,7 +20,7 @@ data:
     storage:
       s3:
         region: eu-west-1
-        bucket: bucket-name
+        bucket: $(S3_BUCKET)
         encrypt: true
       delete:
         enabled: true
@@ -144,7 +144,7 @@ metadata:
     kubernetes.io/ingress.class: traefik-private
 spec:
   rules:
-  - host: registry-browser.example
+  - host: $(REGISTRY_BROWSER_URL)
     http:
       paths:
       - path: /
@@ -162,7 +162,7 @@ metadata:
   namespace: sys-registry
 spec:
   rules:
-  - host: registry.example
+  - host: $(REGISTRY_URL)
     http:
       paths:
       - path: /
@@ -299,7 +299,7 @@ spec:
           - name: ENV_DOCKER_REGISTRY_PORT
             value: "5000"
           - name: ENV_REGISTRY_PROXY_FQDN
-            value: "registry.uw.systems"
+            value: $(REGISTRY_URL)
           - name: ENV_REGISTRY_PROXY_PORT
             value: "443"
         ports:
