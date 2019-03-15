@@ -321,3 +321,6 @@ spec:
         - name: nginx-basicauth-volume
           secret:
             secretName: htpasswd
+            items:
+              - key: htpasswd
+                path: htpasswd
