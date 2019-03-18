@@ -109,7 +109,7 @@ data:
 
                 # To add basic authentication to v2 use auth_basic setting plus add_header
                 auth_basic "Registry realm";
-                auth_basic_user_file /etc/nginx.docker-registry-auth/docker-registry.htpasswd;
+                auth_basic_user_file /etc/nginx.docker-registry-auth/htpasswd;
 
                 ## If $docker_distribution_api_version is empty, the header will not be added.
                 ## See the map directive above where this variable is defined.
