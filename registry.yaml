@@ -131,7 +131,7 @@ spec:
           - -c
           - /etc/nginx.docker-registry/nginx.conf
         ports:
-            containerPort: 8080
+          - containerPort: 8080
         volumeMounts:
           - name: nginx-config
             mountPath: /etc/nginx.docker-registry
