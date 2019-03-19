@@ -89,7 +89,7 @@ spec:
             weight: 100
       containers:
       - name: docker-registry
-        image: registry:2.6.2
+        image: registry:2.7.1
         resources:
           requests:
             cpu: 0m
