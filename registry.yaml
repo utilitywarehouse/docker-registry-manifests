@@ -89,7 +89,7 @@ spec:
             weight: 100
       containers:
       - name: docker-registry
-        image: registry:2.6.2
+        image: registry:2.7.1
         resources:
           requests:
             cpu: 0m
@@ -118,7 +118,7 @@ spec:
             mountPath: /etc/docker/registry/
             readOnly: true
       - name: nginx
-        image: nginx:1.13-alpine
+        image: nginx:1.15-alpine
         resources:
           requests:
             cpu: 0m
