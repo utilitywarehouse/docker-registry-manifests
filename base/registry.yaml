@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    ingress.kubernetes.io/affinity: "true"
+    traefik.backend.loadbalancer.stickiness: "true"
+  labels:
+    name: docker-registry
+  name: docker-registry
+spec:
+  selector:
+    app: docker-registry
+  ports:
+    - name: registry
+      protocol: TCP
+      port: 8080
+    - name: frontend
+      protocol: TCP
+      port: 80
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: docker-registry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: docker-registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-registry
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: docker-registry
+  template:
+    metadata:
+      name: docker-registry
+      labels:
+        app: docker-registry
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - docker-registry
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - name: docker-registry
+          image: registry:2.7.1
+          resources:
+            requests:
+              cpu: 0m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: registry-config
+              mountPath: /etc/docker/registry/
+              readOnly: true
+        - name: nginx
+          image: nginx:1.15-alpine
+          resources:
+            requests:
+              cpu: 0m
+              memory: 0Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          command:
+            - /usr/sbin/nginx
+            - -c
+            - /etc/nginx.docker-registry/nginx.conf
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx.docker-registry
+              readOnly: true
+            - name: basicauth
+              mountPath: /etc/nginx.docker-registry-auth
+              readOnly: true
+        - name: docker-registry-frontend
+          image: konradkleine/docker-registry-frontend:v2
+          resources:
+            requests:
+              cpu: 0m
+              memory: 4Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: ENV_DOCKER_REGISTRY_HOST
+              value: "localhost"
+            - name: ENV_DOCKER_REGISTRY_PORT
+              value: "5000"
+            - name: ENV_REGISTRY_PROXY_PORT
+              value: "443"
+          ports:
+            - name: frontend
+              containerPort: 80
+      volumes:
+        - name: registry-config
+          configMap:
+            name: registry
+            items:
+              - key: config.yml
+                path: config.yml
+        - name: nginx-config
+          configMap:
+            name: registry-nginx
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: basicauth
+          secret:
+            secretName: registry-nginx
+            items:
+              - key: htpasswd
+                path: htpasswd
