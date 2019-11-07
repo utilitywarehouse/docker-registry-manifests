@@ -2,10 +2,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - registry.yaml
+  - registry-auth-cert-rotator.yaml
 configMapGenerator:
   - name: registry
     files:
-      - conf/config.yml
-  - name: registry-nginx
+      - resources/config.yml
+  - name: registry-auth-cert-rotator
     files:
-      - conf/nginx.conf
+      - resources/cert-rotator.sh

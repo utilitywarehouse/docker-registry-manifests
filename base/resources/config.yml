@@ -16,4 +16,8 @@ storage:
   delete:
     enabled: true
 http:
-  addr: localhost:5000
+  addr: :5000
+auth:
+  token:
+    service: registry
+    rootcertbundle: /etc/tls/tls.crt

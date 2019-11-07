@@ -2,16 +2,21 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 bases:
   - ../base
-#- github.com/utilitywarehouse/docker-registry-manifests//base?ref=1.1.0
+# - github.com/utilitywarehouse/docker-registry-manifests//base?ref=v1.1.2
 resources:
+  - rbac.yaml
   - registry-ingress.yaml
 patchesStrategicMerge:
   - registry-patch.yaml
+configMapGenerator:
+  - name: registry-auth
+    files:
+      - resources/auth_config.yml
 secretGenerator:
   - name: registry
     env: secrets/credentials
     type: Opaque
-  - name: registry-nginx
+  - name: registry-auth-passwords
     files:
-      - secrets/htpasswd
+      - secrets/auth_passwords.yml
     type: Opaque

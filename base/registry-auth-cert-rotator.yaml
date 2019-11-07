@@ -1,0 +1,57 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: docker-registry-auth-cert-rotator
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["docker-registry"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: docker-registry-auth-cert-rotator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-registry-auth-cert-rotator
+spec:
+  selector:
+    matchLabels:
+      app: docker-registry-auth-cert-rotator
+  template:
+    metadata:
+      labels:
+        app: docker-registry-auth-cert-rotator
+    spec:
+      serviceAccountName: docker-registry-auth-cert-rotator
+      containers:
+        - name: cert-rotator
+          image: alpine
+          command:
+            - /bin/sh
+            - -c
+            - /src/cert-rotator.sh
+          volumeMounts:
+            - name: registry-auth-cert-rotator
+              mountPath: /src
+            - name: registry-auth-cert
+              mountPath: /etc/tls
+      volumes:
+        - name: registry-auth-cert-rotator
+          configMap:
+            name: registry-auth-cert-rotator
+            items:
+              - key: cert-rotator.sh
+                path: cert-rotator.sh
+            defaultMode: 0700
+        - name: registry-auth-cert
+          secret:
+            secretName: registry-auth-cert
+            defaultMode: 0400
+            optional: true
