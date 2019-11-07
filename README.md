@@ -10,7 +10,7 @@ Reference the base in your `kustomization.yaml`:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 bases:
-  - github.com/utilitywarehouse/docker-registry-manifests//base?ref=v1.1.2
+  - github.com/utilitywarehouse/docker-registry-manifests//base?ref=1.1.0
 ```
 
 ## Example
