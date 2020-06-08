@@ -13,10 +13,10 @@ spec:
   ports:
     - name: registry
       protocol: TCP
-      port: 8080
-    - name: frontend
+      port: 5000
+    - name: auth
       protocol: TCP
-      port: 80
+      port: 5001
 ---
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
@@ -55,6 +55,24 @@ spec:
                         - docker-registry
                 topologyKey: kubernetes.io/hostname
               weight: 100
+      initContainers:
+        # merge sensitive values with the rest of the auth config; this allows
+        # passwords to be stored in an encrypted form while the rest of the
+        # config remains readable
+        - name: merge-config
+          image: mikefarah/yq
+          command:
+            - sh
+            - -c
+            - |
+              yq m /workdir/config/auth_config.yml /workdir/secret-config/auth_config.yml > /config/auth_config.yml
+          volumeMounts:
+            - name: merged-auth-config
+              mountPath: /config
+            - name: registry-auth-config
+              mountPath: /workdir/config
+            - name: registry-auth-config-secret
+              mountPath: /workdir/secret-config
       containers:
         - name: docker-registry
           image: registry:2.7.1
@@ -69,63 +87,56 @@ spec:
             - name: registry-config
               mountPath: /etc/docker/registry/
               readOnly: true
-        - name: nginx
-          image: nginx:1.15-alpine
+            - name: registry-auth-cert
+              mountPath: /etc/tls
+              readOnly: true
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+        - name: docker-registry-auth
+          image: cesanta/docker_auth:1.5.0
+          args:
+            - /config/auth_config.yml
+            - -logtostderr=true
           resources:
             requests:
               cpu: 0m
-              memory: 0Mi
+              memory: 32Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
-          command:
-            - /usr/sbin/nginx
-            - -c
-            - /etc/nginx.docker-registry/nginx.conf
-          ports:
-            - containerPort: 8080
+              cpu: 500m
+              memory: 256Mi
           volumeMounts:
-            - name: nginx-config
-              mountPath: /etc/nginx.docker-registry
+            - name: merged-auth-config
+              mountPath: /config
               readOnly: true
-            - name: basicauth
-              mountPath: /etc/nginx.docker-registry-auth
+            - name: registry-auth-cert
+              mountPath: /etc/tls
               readOnly: true
-        - name: docker-registry-frontend
-          image: konradkleine/docker-registry-frontend:v2
-          resources:
-            requests:
-              cpu: 0m
-              memory: 4Mi
-            limits:
-              cpu: 100m
-              memory: 128Mi
-          env:
-            - name: ENV_DOCKER_REGISTRY_HOST
-              value: "localhost"
-            - name: ENV_DOCKER_REGISTRY_PORT
-              value: "5000"
-            - name: ENV_REGISTRY_PROXY_PORT
-              value: "443"
           ports:
-            - name: frontend
-              containerPort: 80
+            - containerPort: 5001
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5001
       volumes:
+        - name: merged-auth-config
+          emptyDir: {}
+        - name: registry-auth-cert
+          secret:
+            secretName: registry-auth-cert
+            defaultMode: 0400
+        - name: registry-auth-config-secret
+          secret:
+            secretName: registry-auth
+        - name: registry-auth-config
+          configMap:
+            name: registry-auth
         - name: registry-config
           configMap:
             name: registry
             items:
               - key: config.yml
                 path: config.yml
-        - name: nginx-config
-          configMap:
-            name: registry-nginx
-            items:
-              - key: nginx.conf
-                path: nginx.conf
-        - name: basicauth
-          secret:
-            secretName: registry-nginx
-            items:
-              - key: htpasswd
-                path: htpasswd

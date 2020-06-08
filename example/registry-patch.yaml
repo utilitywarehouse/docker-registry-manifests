@@ -8,6 +8,10 @@ spec:
       containers:
         - name: docker-registry
           env:
+            - name: REGISTRY_AUTH_TOKEN_REALM
+              value: "https://registry.example.com/auth"
+            - name: REGISTRY_AUTH_TOKEN_ISSUER
+              value: "example.com"
             - name: REGISTRY_STORAGE_S3_BUCKET
               value: "example-bucket"
             - name: REGISTRY_STORAGE_S3_REGION
@@ -27,7 +31,3 @@ spec:
                 secretKeyRef:
                   name: registry
                   key: registry_http_secret
-        - name: docker-registry-frontend
-          env:
-            - name: ENV_REGISTRY_PROXY_FQDN
-              value: "registry-browser.example.com"
