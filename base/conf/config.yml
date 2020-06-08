@@ -2,7 +2,7 @@
 # "Some config values can be set from the environment, but not if
 # contradictory settings are in the config.yml". We use this as a
 # config data volume to attach to the registry so we can override with
-# ENV variables from Ansible.
+# ENV variables.
 version: 0.1
 log:
   accesslog:
@@ -16,4 +16,8 @@ storage:
   delete:
     enabled: true
 http:
-  addr: localhost:5000
+  addr: :5000
+auth:
+  token:
+    service: registry
+    rootcertbundle: /etc/tls/tls.crt

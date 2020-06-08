@@ -1,6 +1,7 @@
 # docker-registry-manifests
 
-This repository provides a Kustomize base for Docker Registry v2, backed by an S3 bucket.
+This repository provides a Kustomize base for Docker Registry v2, backed by an S3 bucket and with authentication and
+authorization provided by [docker_auth](https://github.com/cesanta/docker_auth).
 
 ## Usage
 

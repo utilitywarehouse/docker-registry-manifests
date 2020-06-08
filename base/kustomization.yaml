@@ -6,6 +6,3 @@ configMapGenerator:
   - name: registry
     files:
       - conf/config.yml
-  - name: registry-nginx
-    files:
-      - conf/nginx.conf
