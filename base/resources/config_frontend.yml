@@ -18,3 +18,7 @@ storage:
       enabled: true
 http:
   addr: localhost:5000
+  debug:
+    addr: :5002
+    prometheus:
+      enabled: true

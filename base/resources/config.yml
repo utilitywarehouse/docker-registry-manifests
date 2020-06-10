@@ -17,6 +17,10 @@ storage:
     enabled: true
 http:
   addr: :5000
+  debug:
+    addr: :5002
+    prometheus:
+      enabled: true
 auth:
   token:
     service: registry
