@@ -9,9 +9,10 @@ patchesStrategicMerge:
   - registry-patch.yaml
 secretGenerator:
   - name: registry
-    env: secrets/credentials
+    envs:
+      - secrets/credentials
     type: Opaque
-  - name: registry-nginx
+  - name: registry-auth
     files:
-      - secrets/htpasswd
+      - secrets/auth_config.yml
     type: Opaque

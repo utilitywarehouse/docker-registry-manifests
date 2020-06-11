@@ -13,7 +13,7 @@ spec:
         paths:
           - path: /
             backend:
-              serviceName: docker-registry
+              serviceName: docker-registry-frontend
               servicePort: 80
 ---
 apiVersion: networking.k8s.io/v1beta1
@@ -29,7 +29,11 @@ spec:
     - host: registry.example.com
       http:
         paths:
+          - path: /auth
+            backend:
+              serviceName: docker-registry-auth
+              servicePort: 5001
           - path: /
             backend:
               serviceName: docker-registry
-              servicePort: 8080
+              servicePort: 5000
