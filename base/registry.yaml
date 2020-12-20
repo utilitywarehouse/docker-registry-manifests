@@ -65,7 +65,7 @@ spec:
         # passwords to be stored in an encrypted form while the rest of the
         # config remains readable
         - name: merge-config
-          image: mikefarah/yq
+          image: mikefarah/yq:3.4.1
           command:
             - sh
             - -c
