@@ -14,12 +14,14 @@ spec:
     - name: frontend
       protocol: TCP
       port: 80
+      targetPort: 8000
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: docker-registry-frontend
 spec:
+  serviceName: docker-registry-frontend
   replicas: 1
   selector:
     matchLabels:
@@ -30,6 +32,84 @@ spec:
       labels:
         app: docker-registry-frontend
     spec:
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      initContainers:
+        # overwrite values in the config file in the overlay
+        - name: frontend-config
+          image: alpine
+          command:
+            - sh
+            - -c
+            - |
+              cat <<"EOF" > /var/docker-registry-ui/config.yml
+              # Adapted from: https://github.com/Quiq/docker-registry-ui/blob/0.9.3/config.yml
+
+              # Listen interface.
+              listen_addr: 0.0.0.0:8000
+              # Base path of Docker Registry UI.
+              base_path: /
+
+              # Registry URL with schema and port.
+              registry_url: http://localhost:5000
+
+              # Verify TLS certificate when using https.
+              verify_tls: true
+
+              # UW: the registry runs on localhost without any authentication
+              # Docker registry credentials.
+              # They need to have a full access to the registry.
+              # If token authentication service is enabled, it will be auto-discovered and those credentials
+              # will be used to obtain access tokens.
+              # When the registry_password_file entry is used, the password can be passed as a docker secret
+              # and read from file. This overides the registry_password entry.
+              # registry_username: user
+              # registry_password: pass
+              # registry_password_file: /run/secrets/registry_password_file
+
+              # Event listener token.
+              # The same one should be configured on Docker registry as Authorization Bearer token.
+              event_listener_token: $(EVENT_LISTENER_TOKEN)
+              # Retention of records to keep.
+              event_retention_days: 7
+
+              # Event listener storage.
+              event_database_driver: sqlite3
+              event_database_location: data/registry_events.db
+              # event_database_driver: mysql
+              # event_database_location: user:password@tcp(localhost:3306)/docker_events
+
+              # You can disable event deletion on some hosts when you are running docker-registry on master-master or
+              # cluster setup to avoid deadlocks or replication break.
+              event_deletion_enabled: true
+
+              # Cache refresh interval in minutes.
+              # How long to cache repository list and tag counts.
+              cache_refresh_interval: 10
+
+              # If users can delete tags. If set to False, then only admins listed below.
+              anyone_can_delete: false
+              # Users allowed to delete tags.
+              # This should be sent via X-WEBAUTH-USER header from your proxy.
+              admins: []
+
+              # Debug mode. Affects only templates.
+              debug: true
+
+              # How many days to keep tags but also keep the minimal count provided no matter how old.
+              purge_tags_keep_days: 90
+              purge_tags_keep_count: 2
+              # Enable built-in cron to schedule purging tags in server mode.
+              # Empty string disables this feature.
+              # Example: '25 54 17 * * *' will run it at 17:54:25 daily.
+              # Note, the cron schedule format includes seconds! See https://godoc.org/github.com/robfig/cron
+              purge_tags_schedule: ''
+              EOF
+          volumeMounts:
+            - mountPath: /var/docker-registry-ui
+              name: frontend-config
       containers:
         - name: docker-registry
           image: registry:2.7.1
@@ -45,7 +125,9 @@ spec:
               mountPath: /etc/docker/registry/
               readOnly: true
         - name: docker-registry-frontend
-          image: konradkleine/docker-registry-frontend:v2
+          image: quiq/docker-registry-ui:0.9.3
+          args:
+            - -config-file=/var/docker-registry-ui/config.yml
           resources:
             requests:
               cpu: 0m
@@ -53,16 +135,14 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
-          env:
-            - name: ENV_DOCKER_REGISTRY_HOST
-              value: "localhost"
-            - name: ENV_DOCKER_REGISTRY_PORT
-              value: "5000"
-            - name: ENV_REGISTRY_PROXY_PORT
-              value: "443"
           ports:
             - name: frontend
-              containerPort: 80
+              containerPort: 8000
+          volumeMounts:
+            - mountPath: /opt/data
+              name: frontend-data
+            - mountPath: /var/docker-registry-ui
+              name: frontend-config
       volumes:
         - name: registry-config
           configMap:
@@ -70,3 +150,14 @@ spec:
             items:
               - key: config.yml
                 path: config.yml
+        - name: frontend-config
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: frontend-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

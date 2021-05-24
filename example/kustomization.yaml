@@ -11,8 +11,14 @@ secretGenerator:
   - name: registry
     envs:
       - secrets/credentials
+    files:
+      - registry_notifications_endpoints=secrets/notifications.yaml
     type: Opaque
   - name: registry-auth
     files:
       - secrets/auth_config.yml
+    type: Opaque
+  - name: registry-frontend
+    envs:
+      - secrets/registry-frontend
     type: Opaque

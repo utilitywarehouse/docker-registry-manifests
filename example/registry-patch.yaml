@@ -31,14 +31,27 @@ spec:
                 secretKeyRef:
                   name: registry
                   key: registry_http_secret
+            - name: REGISTRY_NOTIFICATIONS_ENDPOINTS
+              valueFrom:
+                secretKeyRef:
+                  name: registry
+                  key: registry_notifications_endpoints
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: docker-registry-frontend
 spec:
   template:
     spec:
+      initContainers:
+        - name: frontend-config
+          env:
+            - name: EVENT_LISTENER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: registry-frontend
+                  key: event_listener_token
       containers:
         - name: docker-registry
           env:
@@ -56,7 +69,3 @@ spec:
                 secretKeyRef:
                   name: registry
                   key: registry_storage_s3_secretkey
-        - name: docker-registry-frontend
-          env:
-            - name: ENV_REGISTRY_PROXY_FQDN
-              value: "registry.example.com"
