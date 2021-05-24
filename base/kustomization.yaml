@@ -11,6 +11,7 @@ configMapGenerator:
   - name: registry-frontend
     files:
       - config.yml=resources/config_frontend.yml
+      - nginx.conf=resources/nginx.conf
   - name: registry
     files:
       - resources/config.yml

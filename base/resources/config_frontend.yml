@@ -13,9 +13,8 @@ log:
 storage:
   s3:
     encrypt: true
-  maintenance:
-    readonly:
-      enabled: true
+  delete:
+    enabled: true
 http:
   addr: localhost:5000
   debug:

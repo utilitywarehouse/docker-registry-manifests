@@ -14,7 +14,7 @@ spec:
     - name: frontend
       protocol: TCP
       port: 80
-      targetPort: 8000
+      targetPort: 8080
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -44,11 +44,11 @@ spec:
             - sh
             - -c
             - |
-              cat <<"EOF" > /var/docker-registry-ui/config.yml
+              cat <<EOF > /var/docker-registry-ui/config.yml
               # Adapted from: https://github.com/Quiq/docker-registry-ui/blob/0.9.3/config.yml
 
               # Listen interface.
-              listen_addr: 0.0.0.0:8000
+              listen_addr: 127.0.0.1:8000
               # Base path of Docker Registry UI.
               base_path: /
 
@@ -91,9 +91,14 @@ spec:
 
               # If users can delete tags. If set to False, then only admins listed below.
               anyone_can_delete: false
+
+              # If users can view events. If set to false, then only admins
+              # listed below can.
+              anyone_can_view_events: false
+
               # Users allowed to delete tags.
               # This should be sent via X-WEBAUTH-USER header from your proxy.
-              admins: []
+              admins: ["${ADMINS//,/\", \"}"]
 
               # Debug mode. Affects only templates.
               debug: true
@@ -111,6 +116,42 @@ spec:
             - mountPath: /var/docker-registry-ui
               name: frontend-config
       containers:
+        - name: nginx
+          image: nginx:1.15-alpine
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          resources:
+            requests:
+              cpu: 0m
+              memory: 0Mi
+            limits:
+              cpu: 4000m
+              memory: 128Mi
+          command:
+            - /usr/sbin/nginx
+            - -c
+            - /etc/nginx.docker-registry-ui/nginx.conf
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx.docker-registry-ui
+              readOnly: true
+        - name: oauth
+          image: quay.io/oauth2-proxy/oauth2-proxy:v6.0.0
+          env:
+            - name: OAUTH2_PROXY_SET_XAUTHREQUEST
+              value: "true"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 25Mi
+            limits:
+              cpu: 250m
+              memory: 100Mi
+          ports:
+            - containerPort: 4180
         - name: docker-registry
           image: registry:2.7.1
           resources:
@@ -125,7 +166,7 @@ spec:
               mountPath: /etc/docker/registry/
               readOnly: true
         - name: docker-registry-frontend
-          image: quiq/docker-registry-ui:0.9.3
+          image: quay.io/utilitywarehouse/docker-registry-ui:0.9.3-patch.0
           args:
             - -config-file=/var/docker-registry-ui/config.yml
           resources:
@@ -144,6 +185,12 @@ spec:
             - mountPath: /var/docker-registry-ui
               name: frontend-config
       volumes:
+        - name: nginx-config
+          configMap:
+            name: registry-frontend
+            items:
+              - key: nginx.conf
+                path: nginx.conf
         - name: registry-config
           configMap:
             name: registry-frontend
