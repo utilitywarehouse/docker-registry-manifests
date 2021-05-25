@@ -44,23 +44,6 @@ metadata:
 spec:
   template:
     spec:
-      initContainers:
-        - name: frontend-config
-          env:
-            - name: ADMINS
-              value: "john@example.com,peter@example.com"
-            - name: EVENT_LISTENER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: registry-frontend
-                  key: event_listener_token
-            - name: REGISTRY_USERNAME
-              value: "registry-frontend"
-            - name: REGISTRY_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: registry-frontend
-                  key: registry_password
       containers:
         - name: oauth
           env:
