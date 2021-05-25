@@ -53,20 +53,19 @@ spec:
               base_path: /
 
               # Registry URL with schema and port.
-              registry_url: http://localhost:5000
+              registry_url: http://docker-registry:5000
 
               # Verify TLS certificate when using https.
               verify_tls: true
 
-              # UW: the registry runs on localhost without any authentication
               # Docker registry credentials.
               # They need to have a full access to the registry.
               # If token authentication service is enabled, it will be auto-discovered and those credentials
               # will be used to obtain access tokens.
               # When the registry_password_file entry is used, the password can be passed as a docker secret
               # and read from file. This overides the registry_password entry.
-              # registry_username: user
-              # registry_password: pass
+              registry_username: $(REGISTRY_USERNAME)
+              registry_password: $(REGISTRY_PASSWORD)
               # registry_password_file: /run/secrets/registry_password_file
 
               # Event listener token.
@@ -152,19 +151,6 @@ spec:
               memory: 100Mi
           ports:
             - containerPort: 4180
-        - name: docker-registry
-          image: registry:2.7.1
-          resources:
-            requests:
-              cpu: 0m
-              memory: 32Mi
-            limits:
-              cpu: 500m
-              memory: 256Mi
-          volumeMounts:
-            - name: registry-config
-              mountPath: /etc/docker/registry/
-              readOnly: true
         - name: docker-registry-frontend
           image: quay.io/utilitywarehouse/docker-registry-ui:0.9.3-patch.0
           args:
@@ -191,12 +177,6 @@ spec:
             items:
               - key: nginx.conf
                 path: nginx.conf
-        - name: registry-config
-          configMap:
-            name: registry-frontend
-            items:
-              - key: config.yml
-                path: config.yml
         - name: frontend-config
           emptyDir: {}
   volumeClaimTemplates:
