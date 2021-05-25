@@ -44,28 +44,22 @@ metadata:
 spec:
   template:
     spec:
-      initContainers:
-        - name: frontend-config
+      containers:
+        - name: oauth
           env:
-            - name: EVENT_LISTENER_TOKEN
+            - name: OAUTH2_PROXY_REDIRECT_URL
+              value: "https://example.com/oauth2/callback"
+            - name: OAUTH2_PROXY_CLIENT_ID
+              value: "CLIENT_ID.apps.googleusercontent.com"
+            - name: OAUTH2_PROXY_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: registry-frontend
-                  key: event_listener_token
-      containers:
-        - name: docker-registry
-          env:
-            - name: REGISTRY_STORAGE_S3_BUCKET
-              value: "uw-dev-sys-registry"
-            - name: REGISTRY_STORAGE_S3_REGION
-              value: "eu-west-1"
-            - name: REGISTRY_STORAGE_S3_ACCESSKEY
+                  key: oauth_proxy_client_secret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: registry
-                  key: registry_storage_s3_accesskey
-            - name: REGISTRY_STORAGE_S3_SECRETKEY
-              valueFrom:
-                secretKeyRef:
-                  name: registry
-                  key: registry_storage_s3_secretkey
+                  name: registry-frontend
+                  key: oauth_proxy_cookie_secret
+            - name: OAUTH2_PROXY_EMAIL_DOMAINS
+              value: "example.com"

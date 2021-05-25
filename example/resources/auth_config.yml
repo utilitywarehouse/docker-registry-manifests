@@ -11,6 +11,9 @@ server:
         - "example/*"
       read-only:
         - "/^.*$/"
+    registry-frontend:
+      read-write:
+        - "/^.*$/"
   acl:
     - match: { account: "/.+/", type: "registry", name: "catalog" }
       actions: ["*"]
