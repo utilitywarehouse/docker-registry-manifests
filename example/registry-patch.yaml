@@ -31,35 +31,44 @@ spec:
                 secretKeyRef:
                   name: registry
                   key: registry_http_secret
-            - name: REGISTRY_NOTIFICATIONS_ENDPOINTS
-              valueFrom:
-                secretKeyRef:
-                  name: registry
-                  key: registry_notifications_endpoints
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
-  name: docker-registry-frontend
+  name: registry-browser
 spec:
   template:
     spec:
       containers:
-        - name: oauth
+        - name: registry-browser
           env:
-            - name: OAUTH2_PROXY_REDIRECT_URL
-              value: "https://example.com/oauth2/callback"
-            - name: OAUTH2_PROXY_CLIENT_ID
-              value: "CLIENT_ID.apps.googleusercontent.com"
-            - name: OAUTH2_PROXY_CLIENT_SECRET
+            - name: REGISTRY_BROWSER_S3_BUCKET
+              value: "example-bucket"
+            - name: AWS_REGION
+              value: "eu-west-1"
+            - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: registry-frontend
-                  key: oauth_proxy_client_secret
-            - name: OAUTH2_PROXY_COOKIE_SECRET
+                  name: registry-browser
+                  key: registry_storage_s3_accesskey
+            - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: registry-frontend
-                  key: oauth_proxy_cookie_secret
-            - name: OAUTH2_PROXY_EMAIL_DOMAINS
-              value: "example.com"
+                  name: registry-browser
+                  key: registry_storage_s3_secretkey
+        - name: registry
+          env:
+            - name: REGISTRY_STORAGE_S3_BUCKET
+              value: "example-bucket"
+            - name: REGISTRY_STORAGE_S3_REGION
+              value: "eu-west-1"
+            - name: REGISTRY_STORAGE_S3_ACCESSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: registry-browser
+                  key: registry_storage_s3_accesskey
+            - name: REGISTRY_STORAGE_S3_SECRETKEY
+              valueFrom:
+                secretKeyRef:
+                  name: registry-browser
+                  key: registry_storage_s3_secretkey

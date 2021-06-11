@@ -13,8 +13,8 @@ spec:
         paths:
           - path: /
             backend:
-              serviceName: docker-registry-frontend
-              servicePort: 80
+              serviceName: registry-browser
+              servicePort: 8080
 ---
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
