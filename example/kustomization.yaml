@@ -7,25 +7,16 @@ resources:
   - registry-ingress.yaml
 patchesStrategicMerge:
   - registry-patch.yaml
-configMapGenerator:
-  - name: registry-frontend
-    behavior: merge
-    files:
-      - config.yml=resources/frontend-config.yml
 secretGenerator:
   - name: registry
     envs:
       - secrets/credentials
-    files:
-      - registry_notifications_endpoints=secrets/notifications.yaml
     type: Opaque
   - name: registry-auth
     files:
       - secrets/auth_config.yml
     type: Opaque
-  - name: registry-frontend
+  - name: registry-browser
     envs:
-      - secrets/registry-frontend
-    files:
-      - config.yml=secrets/frontend-config.yml
+      - secrets/registry-browser
     type: Opaque
