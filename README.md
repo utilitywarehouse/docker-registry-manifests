@@ -1,5 +1,7 @@
 # docker-registry-manifests
 
+# DEPRECATED - moved to system-manifests https://github.com/utilitywarehouse/system-manifests/pull/18
+
 This repository provides a Kustomize base for Docker Registry v2, backed by an S3 bucket and with authentication and
 authorization provided by [docker_auth](https://github.com/cesanta/docker_auth).
 
